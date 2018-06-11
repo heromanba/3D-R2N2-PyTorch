@@ -1,0 +1,9 @@
+[global]
+floatX = float32
+<<<<<<< HEAD
+device = gpu0
+=======
+device = cuda0
+[gpuarray]
+preallocate = -1
+>>>>>>> 3D-R2N2-PyTorch
