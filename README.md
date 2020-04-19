@@ -24,7 +24,7 @@ pip install -r requirements.txt
 
 Google drive link(https://drive.google.com/open?id=1LtNhuUQdAeAyIUiuCavofBpjw26Ag6DP)
 
-Baidu pan link()
+Baidu pan link(链接: https://pan.baidu.com/s/12YK4mnQNx9xdCjzV7zx7GA 提取码: 66nf)
 
 - Run
 The predicted object will be saved to ```prediction.obj```.
