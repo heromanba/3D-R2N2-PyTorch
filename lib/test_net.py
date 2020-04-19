@@ -1,3 +1,4 @@
+
 import os
 import numpy as np
 import scipy.io as sio
@@ -5,14 +6,17 @@ import inspect
 import sklearn.metrics
 from multiprocessing import Queue
 
+from torch.utils.data import DataLoader
+
 # Theano & network
 from models import load_model
 from lib.config import cfg
+from lib.dataset import ShapeNetDataset, ShapeNetCollateFn
 from lib.solver import Solver
 from lib.data_io import category_model_id_pair
 from lib.data_process import make_data_processes, get_while_running
 
-from lib.voxel import evaluate_voxel_prediction
+from lib.voxel import evaluate_voxel_prediction, voxel2obj
 
 
 def test_net():
@@ -31,9 +35,10 @@ def test_net():
     #print('Network definition: \n')
     #print(inspect.getsource(NetworkClass.network_definition))
 
-    net = NetworkClass()
-    
+    net = NetworkClass() 
     net.cuda()
+
+    net.eval()
     
     solver = Solver(net)
     solver.load(cfg.CONST.WEIGHTS)
@@ -43,11 +48,19 @@ def test_net():
 
     # set up testing data process. We make only one prefetching process. The
     # process will return one batch at a time.
-    queue = Queue(cfg.QUEUE_SIZE)
-    data_pair = category_model_id_pair(dataset_portion=cfg.TEST.DATASET_PORTION)
-    processes = make_data_processes(queue, data_pair, 1, repeat=False, train=False)
 
-    num_data = len(processes[0].data_paths)
+    test_dataset = ShapeNetDataset(dataset_portion=cfg.TEST.DATASET_PORTION)
+    test_collate_fn = ShapeNetCollateFn(train=False)
+    test_loader = DataLoader(
+        dataset=test_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=1,
+        collate_fn=test_collate_fn,
+        pin_memory=True
+    )
+
+    num_data = len(test_dataset)
     num_batch = int(num_data / batch_size)
 
     # prepare result container
@@ -59,7 +72,7 @@ def test_net():
 
     # Get all test data
     batch_idx = 0
-    for batch_img, batch_voxel in get_while_running(processes[0], queue):
+    for batch_img, batch_voxel in test_loader:
         if batch_idx == num_batch:
             break
 
@@ -67,13 +80,14 @@ def test_net():
         pred, loss, activations = solver.test_output(batch_img, batch_voxel)
         
         #convert pytorch tensor to numpy array
-        pred = pred.data.cpu().numpy()
-        loss = loss.data.cpu().numpy()
+        pred = pred.detach().cpu().numpy()
+        loss = loss.detach().cpu().numpy()
+        batch_voxel_np = batch_voxel.cpu().numpy()
 
         for j in range(batch_size):
             # Save IoU per thresh
             for i, thresh in enumerate(cfg.TEST.VOXEL_THRESH):
-                r = evaluate_voxel_prediction(pred[j, ...], batch_voxel[j, ...], thresh)
+                r = evaluate_voxel_prediction(pred[j, ...], batch_voxel_np[j, ...], thresh)
                 results[str(thresh)][batch_idx, j, :] = r
 
             # Compute AP
@@ -92,4 +106,4 @@ def test_net():
     print('Total loss: %f' % np.mean(results['cost']))
     print('Total mAP: %f' % np.mean(results['mAP']))
 
-    sio.savemat(result_fn, results)
+    # sio.savemat(result_fn, results)

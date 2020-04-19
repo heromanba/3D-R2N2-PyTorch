@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Sat Mar 17 17:04:59 2018
-
-@author: wangchu
-"""
 
 import numpy as np
 
@@ -16,6 +11,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
+
 ###############################################################################
 #                                                                             #
 #                FCConv3DLayer using PyTorch                                  #
@@ -23,7 +19,7 @@ from torch.autograd import Variable
 ###############################################################################
 class FCConv3DLayer_torch(nn.Module):
     def __init__(self, fc_w_fan_in, filter_shape, output_shape):
-        print("\ninitializing \"FCConv3DLayer_torch\"")
+        print("initializing \"FCConv3DLayer_torch\"")
         super(FCConv3DLayer_torch, self).__init__()
         self.output_shape = output_shape
         
@@ -41,12 +37,17 @@ class FCConv3DLayer_torch(nn.Module):
     def forward(self, fc7, h):
         #fc7 is the leakyReLU-ed ouput of fc7 layer
         #h is the hidden state of the previous time step
-        out = self.fc_layer(fc7).view(*self.output_shape) + self.conv3d(h) + self.bias
+        target_shape = list(self.output_shape)
+
+        # To deal with different batch_size.
+        target_shape[0] = -1    
+
+        out = self.fc_layer(fc7).view(*target_shape) + self.conv3d(h) + self.bias
         return out
     
 class BN_FCConv3DLayer_torch(nn.Module):
     def __init__(self, fc_w_fan_in, filter_shape, output_shape):
-        print("\ninitializing \"FCConv3DLayer_torch\"")
+        print("initializing \"FCConv3DLayer_torch\"")
         super(BN_FCConv3DLayer_torch, self).__init__()
         self.output_shape = output_shape
         
@@ -69,7 +70,12 @@ class BN_FCConv3DLayer_torch(nn.Module):
     def forward(self, fc7, h, time):
         #fc7 is the leakyReLU-ed ouput of fc7 layer
         #h is the hidden state of the previous time step
-        fc7 = self.fc_layer(fc7).view(*self.output_shape)
+        target_shape = list(self.output_shape)
+
+        # To deal with different batch_size.
+        target_shape[0] = -1    
+
+        fc7 = self.fc_layer(fc7).view(*target_shape)
         bn_fc7 = self.bn1(fc7, time)    #the input of Recurrent_BatchNorm3d is (input_, time)
         
         conv3d = self.conv3d(h) 
@@ -85,7 +91,7 @@ class BN_FCConv3DLayer_torch(nn.Module):
 ###############################################################################
 class Unpool3DLayer(nn.Module):
     def __init__(self, unpool_size=2, padding=0):
-        print("\ninitializing \"Unpool3DLayer\"")
+        print("initializing \"Unpool3DLayer\"")
         super(Unpool3DLayer, self).__init__()
         self.unpool_size = unpool_size
         self.padding = padding
@@ -96,12 +102,12 @@ class Unpool3DLayer(nn.Module):
         #x.size() is (batch_size, channels, depth, height, width)
         output_size = (x.size(0), x.size(1), n * x.size(2), n * x.size(3), n * x.size(4))
         
-        out_tensor = torch.FloatTensor(*output_size).zero_()
+        out_tensor = torch.Tensor(*output_size).zero_()
         
         if torch.cuda.is_available():
-            out_tensor = out_tensor.type(torch.cuda.FloatTensor)
+            out_tensor = out_tensor.cuda()
             
-        out = Variable(out_tensor)
+        out = out_tensor
 
         out[:, \
             :, \
@@ -117,7 +123,7 @@ class Unpool3DLayer(nn.Module):
 ###############################################################################
 class SoftmaxWithLoss3D(nn.Module):
     def __init__(self):
-        print("\ninitializing \"SoftmaxWithLoss3D\"")
+        print("initializing \"SoftmaxWithLoss3D\"")
         super(SoftmaxWithLoss3D, self).__init__()
     
     def forward(self, inputs, y=None, test=False):

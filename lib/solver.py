@@ -9,17 +9,18 @@ import torch
 from torch.optim import SGD, Adam, lr_scheduler
 from torch.autograd import Variable
 
+
 def max_or_nan(params):
     params = list(params)
     nan_or_max_param = torch.FloatTensor(len(params)).zero_()
     if torch.cuda.is_available():
-        nan_or_max_param = nan_or_max_param.type(torch.cuda.FloatTensor)
+        nan_or_max_param = nan_or_max_param.cuda()
         
     for param_idx, param in enumerate(params):
         # If there is nan, max will return nan
-        #Note that param is Variable
-        nan_or_max_param[param_idx] = torch.max(torch.abs(param))[0].data[0]
-        print('param %d : %f' % (param_idx, nan_or_max_param[param_idx]))
+        # Note that param is Variable
+        nan_or_max_param[param_idx] = torch.max(torch.abs(param)).item()
+        # print('param %d : %f' % (param_idx, nan_or_max_param[param_idx]))
     return nan_or_max_param
 
 
@@ -51,19 +52,16 @@ class Solver(object):
     def train_loss(self, x, y):
         """
         y is provided and test is False, only the loss will be returned.
+
+        Args:
+            x (torch.Tensor): batch_img_tensor
+            y (torch.Tensor): batch_voxel_tensor
         """
-        x = torch.FloatTensor(x)
-        y = torch.FloatTensor(y)
         
         if torch.cuda.is_available():
-            x.cuda(async=True)
-            y.cuda(async=True)
-            x = x.type(torch.cuda.FloatTensor)
-            y = y.type(torch.cuda.FloatTensor)
+            x = x.cuda()
+            y = y.cuda()
             
-        x = Variable(x, requires_grad = False)
-        y = Variable(y, requires_grad = False)
-        
         loss = self.net(x, y, test=False)
         
         #compute gradient and do parameter update step
@@ -73,7 +71,7 @@ class Solver(object):
         
         return loss
 
-    def train(self, train_queue, val_queue=None):
+    def train(self, train_loader, val_loader=None):
         ''' Given data queues, train the network '''
         # Parameter directory
         save_dir = os.path.join(cfg.DIR.OUT_PATH)
@@ -98,11 +96,17 @@ class Solver(object):
             start_iter = cfg.TRAIN.INITIAL_ITERATION
 
         # Main training loop
+        train_loader_iter = iter(train_loader)
         for train_ind in range(start_iter, cfg.TRAIN.NUM_ITERATION + 1):
             self.lr_scheduler.step()
             
             data_timer.tic()
-            batch_img, batch_voxel = train_queue.get()
+            try:
+                batch_img, batch_voxel = train_loader_iter.next()
+            except StopIteration:
+                train_loader_iter = iter(train_loader)
+                batch_img, batch_voxel = train_loader_iter.next()
+
             data_timer.toc()
 
             if self.net.is_x_tensor4:
@@ -113,7 +117,7 @@ class Solver(object):
             loss = self.train_loss(batch_img, batch_voxel)
             train_timer.toc()
 
-            training_losses.append(loss.data[0])
+            training_losses.append(loss.item())
 
             # Decrease learning rate at certain points
             if train_ind in lr_steps:
@@ -128,15 +132,17 @@ class Solver(object):
                 # Print the current loss
                 print('%s Iter: %d Loss: %f' % (datetime.now(), train_ind, loss))
 
-            if train_ind % cfg.TRAIN.VALIDATION_FREQ == 0 and val_queue is not None:
+            if train_ind % cfg.TRAIN.VALIDATION_FREQ == 0 and val_loader is not None:
                 # Print test loss and params to check convergence every N iterations
 
                 val_losses = 0
-                for i in range(cfg.TRAIN.NUM_VALIDATION_ITERATIONS):
-                    batch_img, batch_voxel = val_queue.get()
+                val_num_iter = min(cfg.TRAIN.NUM_VALIDATION_ITERATIONS, len(val_loader))
+                val_loader_iter = iter(val_loader)
+                for i in range(val_num_iter):
+                    batch_img, batch_voxel = val_loader_iter.next()
                     val_loss = self.train_loss(batch_img, batch_voxel)
                     val_losses += val_loss
-                var_losses_mean = val_losses / cfg.TRAIN.NUM_VALIDATION_ITERATIONS
+                var_losses_mean = val_losses / val_num_iter
                 print('%s Test loss: %f' % (datetime.now(), var_losses_mean))
 
             if train_ind % cfg.TRAIN.NAN_CHECK_FREQ == 0:
@@ -146,11 +152,13 @@ class Solver(object):
                     print('NAN detected')
                     break
 
-            if train_ind % cfg.TRAIN.SAVE_FREQ == 0 and not train_ind == 0:
+            if (train_ind % cfg.TRAIN.SAVE_FREQ == 0 and not train_ind == 0) or \
+                    (train_ind == cfg.TRAIN.NUM_ITERATION):
+                # Save the checkpoint every a few iterations or at the end.
                 self.save(training_losses, save_dir, train_ind)
 
             #loss is a Variable containing torch.FloatTensor of size 1
-            if loss.data[0] > cfg.TRAIN.LOSS_LIMIT:
+            if loss.item() > cfg.TRAIN.LOSS_LIMIT:
                 print("Cost exceeds the threshold. Stop training")
                 break
 
@@ -159,7 +167,7 @@ class Solver(object):
         symlink to the latest param so that the training function can easily
         load the latest model'''
 
-        save_path = os.path.join(save_dir, 'checkpoint.%d.tar' % (step))
+        save_path = os.path.join(save_dir, 'checkpoint.%d.pth' % (step))
         
         #both states of the network and the optimizer need to be saved
         state_dict = {'net_state': self.net.state_dict()}
@@ -167,7 +175,7 @@ class Solver(object):
         torch.save(state_dict, save_path)
         
         # Make a symlink for weights.npy
-        symlink_path = os.path.join(save_dir, 'checkpoint.tar')
+        symlink_path = os.path.join(save_dir, 'checkpoint.pth')
         if os.path.lexists(symlink_path):
             os.remove(symlink_path)
             
@@ -182,7 +190,10 @@ class Solver(object):
     def load(self, filename):
         if os.path.isfile(filename):
             print("loading checkpoint from '{}'".format(filename))
-            checkpoint = torch.load(filename)
+            if torch.cuda.is_available():
+                checkpoint = torch.load(filename)
+            else:
+                checkpoint = torch.load(filename, map_location='cpu')
             
             net_state = checkpoint['net_state']
             optim_state = checkpoint['optimizer_state']
@@ -200,26 +211,22 @@ class Solver(object):
         activation.
         In test mode, if y is None, then the out is the [prediction].
         In test mode, if y is not None, then the out is [prediction, loss].
+
+        Args:
+            x (torch.Tensor): batch_img_tensor
+            y (torch.Tensor): batch_voxel_tensor
         """
-        x = torch.FloatTensor(x)
-        y = torch.FloatTensor(y)
         
         if torch.cuda.is_available():
-            x.cuda(async=True)
-            y.cuda(async=True)
-            x = x.type(torch.cuda.FloatTensor)
-            y = y.type(torch.cuda.FloatTensor)
-        
-        x = Variable(x, requires_grad = False)
-        y = Variable(y, requires_grad = False)
+            x = x.cuda()
+            if y is not None:
+                y = y.cuda()
         
         # Parse the result
         results = self.net(x, y, test=True)
         prediction = results[0]
         loss = results[1]
         activations = results[2:]
-
-
         if y is None:
             return prediction, activations
         else:
