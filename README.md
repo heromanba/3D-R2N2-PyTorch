@@ -22,9 +22,9 @@ pip install -r requirements.txt
 ## Demo
 - Download pretrained model(ResidualGRUNet), and put ```checkpoint.pth``` under ```output/ResidualGRUNet/default_model```.
 
-Google drive link(https://drive.google.com/open?id=1LtNhuUQdAeAyIUiuCavofBpjw26Ag6DP)
+    Google drive link(https://drive.google.com/open?id=1LtNhuUQdAeAyIUiuCavofBpjw26Ag6DP)
 
-Baidu pan link(链接: https://pan.baidu.com/s/12YK4mnQNx9xdCjzV7zx7GA 提取码: 66nf)
+    Baidu pan link(链接: https://pan.baidu.com/s/12YK4mnQNx9xdCjzV7zx7GA 提取码: 66nf)
 
 - Run
 The predicted object will be saved to ```prediction.obj```.
@@ -36,9 +36,9 @@ python demo.py
 ### Prepare dataset
 - Use the same dataset as mentioned in the original repo.
 
-ShapeNet rendered images http://cvgl.stanford.edu/data2/ShapeNetRendering.tgz
+    ShapeNet rendered images http://cvgl.stanford.edu/data2/ShapeNetRendering.tgz
 
-ShapeNet voxelized models http://cvgl.stanford.edu/data2/ShapeNetVox32.tgz
+    ShapeNet voxelized models http://cvgl.stanford.edu/data2/ShapeNetVox32.tgz
 
 - Extract data into ```ShapeNet``` directory, the file structure in ```ShapeNet``` should be like this:
 ```
