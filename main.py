@@ -114,7 +114,7 @@ def main():
     
 
 if __name__ == '__main__':
-    mp.log_to_stderr()
+    # mp.log_to_stderr()
     logger = mp.get_logger()
     logger.setLevel(logging.INFO)
     

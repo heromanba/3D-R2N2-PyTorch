@@ -13,38 +13,37 @@ import shutil
 import numpy as np
 from subprocess import call
 
+import torch
+
 from PIL import Image
 from models import load_model
 from lib.config import cfg, cfg_from_list
+from lib.data_augmentation import preprocess_img
 from lib.solver import Solver
 from lib.voxel import voxel2obj
 
-DEFAULT_WEIGHTS = 'output/ResidualGRUNet/default_model/weights.npy'
+
+DEFAULT_WEIGHTS = 'output/ResidualGRUNet/default_model/checkpoint.pth'
 
 
 def cmd_exists(cmd):
     return shutil.which(cmd) is not None
 
 
-def download_model(fn):
-    if not os.path.isfile(fn):
-        # Download the file if doewn't exist
-        print('Downloading a pretrained model')
-        call(['curl', 'ftp://cs.stanford.edu/cs/cvgl/ResidualGRUNet.npy',
-              '--create-dirs', '-o', fn])
-
-
-from lib.data_augmentation import preprocess_img
-import matplotlib.pyplot as plt
 def load_demo_images():
-    ims = []
+    img_h = cfg.CONST.IMG_H
+    img_w = cfg.CONST.IMG_W
+    
+    imgs = []
+    
     for i in range(3):
-        im = preprocess_img(Image.open('imgs/%d.jpg' % i).resize((127,127)), train=False)
-        ims.append([np.array(im).transpose(
-            (2, 0, 1)).astype(np.float32)])
-        plt.imshow(im)
-        plt.show()
-    return np.array(ims)
+        img = Image.open('imgs/%d.png' % i)
+        img = img.resize((img_h, img_w), Image.ANTIALIAS)
+        img = preprocess_img(img, train=False)
+        imgs.append([np.array(img).transpose( \
+                        (2, 0, 1)).astype(np.float32)])
+    ims_np = np.array(imgs).astype(np.float32)
+    return torch.from_numpy(ims_np)
 
 
 def main():
@@ -55,22 +54,25 @@ def main():
     # load images
     demo_imgs = load_demo_images()
 
-    # Download and load pretrained weights
-    download_model(DEFAULT_WEIGHTS)
-
     # Use the default network model
     NetClass = load_model('ResidualGRUNet')
 
     # Define a network and a solver. Solver provides a wrapper for the test function.
-    net = NetClass(compute_grad=False)  # instantiate a network
-    net.load(DEFAULT_WEIGHTS)                        # load downloaded weights
+    net = NetClass()  # instantiate a network
+    if torch.cuda.is_available():
+        net.cuda()
+
+    net.eval()
+
     solver = Solver(net)                # instantiate a solver
+    solver.load(DEFAULT_WEIGHTS)
 
     # Run the network
     voxel_prediction, _ = solver.test_output(demo_imgs)
-    
+    voxel_prediction = voxel_prediction.detach().cpu().numpy()
+
     # Save the prediction to an OBJ file (mesh file).
-    voxel2obj(pred_file_name, voxel_prediction[0, :, 1, :, :] > cfg.TEST.VOXEL_THRESH)
+    voxel2obj(pred_file_name, voxel_prediction[0, 1] > cfg.TEST.VOXEL_THRESH)
 
     # Use meshlab or other mesh viewers to visualize the prediction.
     # For Ubuntu>=14.04, you can install meshlab using

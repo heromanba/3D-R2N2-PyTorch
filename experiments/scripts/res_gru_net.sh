@@ -15,10 +15,8 @@ mkdir -p $OUT_PATH
 exec &> >(tee -a "$LOG")
 echo Logging output to "$LOG"
 
-export THEANO_FLAGS="floatX=float32,device=cuda0,optimizer_including=cudnn,assert_no_cpu_op='raise'"
-
 python3 main.py \
-      --batch-size 24 \
+      --batch-size 20 \
       --iter 60000 \
       --out $OUT_PATH \
       --model $NET_NAME \
@@ -28,6 +26,6 @@ python3 main.py \
       --test \
       --batch-size 1 \
       --out $OUT_PATH \
-      --weights $OUT_PATH/weights.npy \
+      --weights $OUT_PATH/checkpoint.pth \
       --model $NET_NAME \
       ${*:1}
