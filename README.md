@@ -20,9 +20,9 @@ pip install -r requirements.txt
 ```
 
 ## Demo
-- Download pretrained model(ResidualGRUNet).
+- Download pretrained model(ResidualGRUNet), and put ```checkpoint.pth``` under ```output/ResidualGRUNet/default_model```.
 
-Google drive link()
+Google drive link(https://drive.google.com/open?id=1LtNhuUQdAeAyIUiuCavofBpjw26Ag6DP)
 
 Baidu pan link()
 
