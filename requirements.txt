@@ -1,5 +1,5 @@
 numpy
-Theano>=0.8
+torch
 EasyDict
 Pillow
 pyyaml
