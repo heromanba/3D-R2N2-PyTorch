@@ -16,7 +16,7 @@ from torch.nn import Linear, Conv2d, MaxPool2d, \
 ##########################################################################################
 class GRUNet(BaseGRUNet):
     def __init__(self):
-        print("\ninitializing \"GRUNet\"")
+        print("initializing \"GRUNet\"")
         super(GRUNet, self).__init__()
         """
         Set the necessary data of the network
@@ -39,7 +39,7 @@ class GRUNet(BaseGRUNet):
 class encoder(nn.Module):
     def __init__(self, input_shape, n_convfilter, \
                  n_fc_filters, h_shape, conv3d_filter_shape):
-        print("\ninitializing \"encoder\"")
+        print("initializing \"encoder\"")
         #input_shape = (self.batch_size, 3, img_w, img_h)
         super(encoder, self).__init__()
         #conv1
@@ -162,7 +162,7 @@ class encoder(nn.Module):
 ##########################################################################################
 class decoder(nn.Module):
     def __init__(self, n_deconvfilter, h_shape):
-        print("\ninitializing \"decoder\"")
+        print("initializing \"decoder\"")
         super(decoder, self).__init__()
         #3d conv7
         conv7_kernel_size = 3

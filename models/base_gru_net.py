@@ -24,7 +24,7 @@ class BaseGRUNet(Net):
     and forward pass. The only difference is different encoder and decoder architecture.
     """
     def __init__(self):
-        print("\ninitializing \"BaseGRUNet\"")
+        print("initializing \"BaseGRUNet\"")
         super(BaseGRUNet, self).__init__()
         """
         Set the necessary data of the network
@@ -95,7 +95,7 @@ class BaseGRUNet(Net):
     def initHidden(self, h_shape):
         h = torch.zeros(h_shape)
         if torch.cuda.is_available():
-            h = h.type(torch.cuda.FloatTensor)
+            h = h.cuda()
         return Variable(h)
     
     
